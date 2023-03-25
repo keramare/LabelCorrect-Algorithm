@@ -1,0 +1,179 @@
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.util.*;
+
+public class Graf {
+    String fileName = "src/Strakonice.hrn";
+    int pocetVrcholov = 1;
+    int pocetHran = 0;
+    private ArrayList<Hrana> zoznamHran;
+    private Vrchol[] zoznamVrcholov;
+    private ArrayList<Vrchol> mnozinaE;
+    private static final int NEKONECNO = Integer.MAX_VALUE / 2;
+    private int userZaciatocny;
+    private int userKoncovy;
+    private int vypisPostupu;  // toto je na riadku 137
+    private ArrayList<Integer> cesta = new ArrayList<Integer>();
+    private ArrayList<Vrchol> najdeneCesty = new ArrayList<Vrchol>();
+
+    public Graf() {
+        this.zoznamHran = new ArrayList<Hrana>();
+        this.mnozinaE = new ArrayList<Vrchol>();
+    }
+
+    // i predstavuje vrchol i -> V ktory ma dve znacky t(i) , x(i).
+    // t(i) predstavuje horny odhad dlzky doteraz najdenej najlepsej u–i cesty
+    // x(i) jej predposledny vrchol.
+
+    // main metoda, vola dalsie metody na spustenie algoritmu
+    public static void main(String[] args) throws FileNotFoundException {
+        Graf g = new Graf();
+        g.nacitajUdaje();
+        g.meow();
+        g.cyklus();
+    }
+
+    // zo suboru nacita 3 hodnoty a urci pocet hran (zaciatocny a koncovy vrchol a cenu do koncoveho vrchola)
+    public void nacitajUdaje() throws FileNotFoundException {
+        //otvorenie textoveho suboru
+        Scanner s = new Scanner(new FileInputStream(fileName));
+
+        // nacitavanie hodnot
+        while (s.hasNext()) {
+            int zaciatocnyVrchol = s.nextInt();
+            int koncovyVrchol = s.nextInt();
+            int cena = s.nextInt();
+
+            // urcenie poctu hran
+            pocetHran++;
+            if (pocetVrcholov < zaciatocnyVrchol) {
+                this.pocetVrcholov = zaciatocnyVrchol;
+            }
+            if (pocetVrcholov < koncovyVrchol) {
+                this.pocetVrcholov = koncovyVrchol;
+            }
+
+            // vytvorenie HRANY do a pridanie do listu (hrana ma vrcholy ako datovy typ INTEGER a nie ako VRCHOL)
+            this.zoznamHran.add(new Hrana(zaciatocnyVrchol, koncovyVrchol, cena));
+        }
+        for (Hrana h : this.zoznamHran) {
+            h.vypis();
+        }
+        s.close();
+    }
+
+    public void meow() {
+        // vstup od uzivatela - zaciatocny vrchol a koncovy vrchol
+        Scanner userInput = new Scanner(System.in);
+        System.out.println("od ktoreho vrcholu chces zacat? (vloz cislo) : ");
+        this.userZaciatocny = userInput.nextInt();
+        System.out.println("do ktoreho vrcholu? : ");
+        this.userKoncovy = userInput.nextInt();
+        System.out.println("Chces vypisat aj postup (toto spomali beh programu)  [1-ano, 2-nie]");
+        this.vypisPostupu = userInput.nextInt();
+
+
+        // vytvor vsetky vrcholy a nastav im hodnotu na nekonecno okrem zaciatocneho
+        // index nula neobsahuje vrchol, kvoli lahkemu indexovaniu
+        // zaciatocny vrchol pridaj na kontrolu
+        this.zoznamVrcholov = new Vrchol[pocetVrcholov + 1];
+        this.zoznamVrcholov[0] = new Vrchol(0);
+
+        for (int i = 0; i < pocetVrcholov; i++) {
+            Vrchol novyVrchol = new Vrchol(i + 1);
+            novyVrchol.setZatedyNajlepsiaCena(NEKONECNO);
+            this.zoznamVrcholov[i + 1] = novyVrchol;
+        }
+
+        // zaciatocny vrchol od uzivatela daj na kontrolu a nastav hodnotu na 0 namiesto nekonecno
+        this.zoznamVrcholov[this.userZaciatocny].setZatedyNajlepsiaCena(0);
+        this.zoznamVrcholov[this.userZaciatocny].setPredposlednyVrchol(null);
+        this.mnozinaE.add(this.zoznamVrcholov[this.userZaciatocny]);
+    }
+
+    public void cyklus() {
+        // cyklus zacitana zaciatocnym vrcholom, ktory user zadal
+
+        ArrayList<Vrchol> pomocnaMnozinaE = new ArrayList<Vrchol>();
+        if (!this.mnozinaE.isEmpty()) {
+
+            // zoberem prvy vrchol z mnoziny
+            Vrchol prvyVrchol = this.mnozinaE.get(0);
+
+            for (Hrana h : this.zoznamHran) {
+                // pridam cenu len hranam ktorych zaciatocny vrchol so rovna prvemu vrcholu v mnozineE
+                if (h.getZaciatocnyVrchol() == prvyVrchol.getCisloVrcholu()) {
+                    int cena = prvyVrchol.getZatedyNajlepsiaCena() + h.getCena();
+
+                    // ak sa cena zlepsila do koncoveho vrchola,  nastav lepsiu cenu && nastav predposledny vrchol
+                    if (cena < this.zoznamVrcholov[h.getKoncovyVrchol()].getZatedyNajlepsiaCena()) {
+                        this.zoznamVrcholov[h.getKoncovyVrchol()].setZatedyNajlepsiaCena(cena);
+                        this.zoznamVrcholov[h.getKoncovyVrchol()].setPredposlednyVrchol(prvyVrchol);
+
+                        // ak sa koncovy vrchol hrany rovna vrcholu, ktory pouzivatel zadal -> pridaj kopiu tohto vrchola do najdenych ciest, a ak nie tak pridaj do mnoziny E
+                        if (this.zoznamVrcholov[h.getKoncovyVrchol()].getCisloVrcholu() == this.userKoncovy) {
+                            this.zoznamVrcholov[h.getKoncovyVrchol()].setZatedyNajlepsiaCena(cena);
+                        } else {
+                            pomocnaMnozinaE.add(this.zoznamVrcholov[h.getKoncovyVrchol()]);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (Vrchol pomocnyE : pomocnaMnozinaE) {
+            if (!this.mnozinaE.contains(pomocnyE)) {
+                this.mnozinaE.add(pomocnyE);
+            }
+        }
+        this.najdeneCesty.add(this.mnozinaE.get(0));
+        this.mnozinaE.remove(0);
+
+        // VYPIS POSTUPU
+        if (this.vypisPostupu==1) {
+            for (Vrchol v : this.mnozinaE) {
+                v.vypis();
+            } System.out.println("----------------------------------------------------------------");
+        }
+        if (!this.mnozinaE.isEmpty()) {
+            this.cyklus();
+        } else {
+            this.spracujCestu();
+            this.vypisCestu();
+        }
+    }
+
+    // spracovanie ciest k vrcholu
+    public void spracujCestu() {
+        int koncovyVrchol = this.userKoncovy;
+        while (koncovyVrchol != this.userZaciatocny) {
+            koncovyVrchol = spracujVrchol(koncovyVrchol);
+            if (koncovyVrchol == 0) {
+                System.out.println("DO ZADANEHO VRCHOLU NEEXISTUJE CESTA!");
+                break;
+            }
+        }
+        if (koncovyVrchol != 0) {
+            Collections.reverse(this.cesta);
+        }
+    }
+
+    public int spracujVrchol(int cisloVrchola) {
+        this.cesta.add(cisloVrchola);
+        if (this.zoznamVrcholov[cisloVrchola].getPredposlednyVrchol() == null) {
+            return 0;
+        }
+        return this.zoznamVrcholov[cisloVrchola].getPredposlednyVrchol().getCisloVrcholu();
+    }
+
+    public void vypisCestu() {
+        StringBuilder sb = new StringBuilder("Do koncoveho vrchola sa dostanes cestou: " + Integer.toString(this.userZaciatocny) + "->");
+        System.out.println();
+        for (Integer vrchol : this.cesta) {
+            sb.append(Integer.toString(vrchol)).append("->");
+        } sb.setLength(sb.length() - 2);
+        System.out.println(sb);
+    }
+
+
+}
